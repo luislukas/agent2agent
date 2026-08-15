@@ -1,4 +1,4 @@
-# A2A Capability Discovery POC
+# A2A Capability Discovery
 
 A local, Docker-deployable proof of concept of agent-to-agent communication
 built on the official **[a2a-sdk](https://github.com/a2aproject/a2a-python)**
