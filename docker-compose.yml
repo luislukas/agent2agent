@@ -1,0 +1,74 @@
+services:
+  registry:
+    build: ./registry
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  add-agent:
+    build: ./add-agent
+    ports:
+      - "8001:8001"
+    environment:
+      - REGISTRY_URL=http://registry:8000
+      - SELF_URL=http://add-agent:8001/
+      - HEARTBEAT_SECONDS=${HEARTBEAT_SECONDS:-30}
+    depends_on:
+      registry:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/healthz', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  multiply-agent:
+    build: ./multiply-agent
+    ports:
+      - "8002:8002"
+    environment:
+      - REGISTRY_URL=http://registry:8000
+      - SELF_URL=http://multiply-agent:8002/
+      - HEARTBEAT_SECONDS=${HEARTBEAT_SECONDS:-30}
+    depends_on:
+      registry:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/healthz', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  orchestrator:
+    build: ./orchestrator
+    ports:
+      - "8003:8003"
+    environment:
+      - REGISTRY_URL=http://registry:8000
+      - SELF_URL=http://orchestrator:8003/
+      - HEARTBEAT_SECONDS=${HEARTBEAT_SECONDS:-30}
+      - MAX_LLM_STEPS=${MAX_LLM_STEPS:-10}
+      # Required only for the LLM-driven planning (math.solve / /solveLLM).
+      # Set it in a local .env file or your shell before `docker compose up`;
+      # nothing is committed.
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    depends_on:
+      registry:
+        condition: service_healthy
+      add-agent:
+        condition: service_healthy
+      multiply-agent:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/healthz', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s

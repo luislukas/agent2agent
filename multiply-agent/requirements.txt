@@ -1,0 +1,5 @@
+fastapi==0.141.1
+uvicorn[standard]==0.52.3
+requests==2.34.2
+a2a-sdk[fastapi]==1.1.2
+protobuf==6.33.6
