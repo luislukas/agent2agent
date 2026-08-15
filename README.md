@@ -349,25 +349,36 @@ docker compose down
   `InvalidParamsError` inside an `AgentExecutor` produces a correct,
   spec-shaped JSON-RPC error response automatically.
 
-## What changed from the hand-rolled version
+## Why the SDK beats parsing the wire format by hand
 
-- Added the one dependency this whole approach is about: `a2a-sdk[fastapi]`
-  (pulls in `fastapi`, `starlette`, `sse-starlette` as sub-dependencies).
-- Removed: every hand-rolled JSON-RPC helper (`_jsonrpc_error`,
-  `_extract_operands`/`_extract_expression`, `_build_message_send`/
-  `_parse_task_result`), the manual `POST /` dispatcher, the manual
-  `.well-known` route handler, and the standalone `agent-card.json` files
-  (Agent Cards are now typed Python objects built with `a2a.types`).
-- Changed: `invoke_capability` and the expression-decomposition call chain
-  (`_solve_expression_llm`, `/solveLLM`) are now `async`,
-  since the SDK's client is `httpx`-based.
-- Unchanged: the registry service (no SDK involvement -- it's our own
-  discovery index), the retry/heartbeat reliability pattern, Docker
-  healthchecks, and the `/solveLLM` REST convenience layer.
-- Numbers now serialize as floats (`5.0` instead of `5`) end-to-end. This
-  is a consequence of the SDK's `data` Part using `google.protobuf.Struct`,
-  which represents all JSON numbers as float64 -- not a bug, and not
-  something worth working around.
+- **One dependency replaces a pile of protocol code.** `a2a-sdk[fastapi]`
+  (pulling in `fastapi`, `starlette`, `sse-starlette`) is the only thing
+  added, and in exchange every hand-written JSON-RPC helper disappears:
+  the error builders (`_jsonrpc_error`), the request/response translators
+  (`_extract_operands`/`_extract_expression`, `_build_message_send`/
+  `_parse_task_result`), the manual `POST /` dispatcher, and the manual
+  `.well-known` route handler. That's code we no longer own, test, or keep
+  in step with the spec.
+- **Agent Cards become typed objects instead of hand-edited JSON.** Built
+  with `a2a.types` rather than standalone `agent-card.json` files, so a
+  wrong field name is a Python error at startup, not a client that silently
+  fails to discover a skill.
+- **Correctness comes from the library, not from re-reading the spec.**
+  Protocol version negotiation, Task/Part encoding and spec-shaped error
+  responses are the SDK's job; manual parsing only looks equivalent until
+  a detail like the `SendMessage` method name or the `A2A-Version` header
+  is subtly wrong.
+- **The cost is small and bounded.** `invoke_capability` and the
+  expression-decomposition chain (`_solve_expression_llm`, `/solveLLM`)
+  became `async` because the SDK's client is `httpx`-based, and numbers now
+  serialize as floats (`5.0` instead of `5`) because the SDK's `data` Part
+  uses `google.protobuf.Struct`, which represents all JSON numbers as
+  float64 -- not a bug, and not worth working around.
+- **Everything outside the protocol is untouched.** The registry service
+  (our own discovery index, no SDK involvement), the retry/heartbeat
+  reliability pattern, Docker healthchecks, and the `/solveLLM` REST
+  convenience layer all stay as they were -- adopting the SDK only replaced
+  the parts that were re-implementing the standard.
 
 ## Known gaps -- not implemented, and why
 
